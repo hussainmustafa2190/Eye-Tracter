@@ -1,0 +1,98 @@
+@import 'tailwindcss';
+
+/* Horizontal phase tab bar: hide scrollbar but keep touch/drag scroll. */
+.phase-tabbar-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / legacy Edge */
+}
+.phase-tabbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  color-scheme: light dark;
+}
+
+:root {
+  --color-text-secondary: #64748b; /* slate-500 */
+}
+.dark {
+  --color-text-secondary: #94a3b8; /* slate-400 */
+}
+
+/* Subtle “confetti” flash when a task is marked complete (no extra libraries). */
+@keyframes task-complete-confetti {
+  0% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 0 0 rgb(45 212 191 / 0),
+      0 0 0 0 rgb(56 189 248 / 0),
+      0 0 0 0 rgb(167 139 250 / 0);
+  }
+  35% {
+    filter: brightness(1.04);
+    box-shadow:
+      0 0 0 2px rgb(45 212 191 / 0.45),
+      -8px -6px 0 -1px rgb(56 189 248 / 0.5),
+      8px 5px 0 -1px rgb(167 139 250 / 0.45);
+  }
+  55% {
+    box-shadow:
+      0 0 14px 3px rgb(45 212 191 / 0.35),
+      -5px 8px 0 -2px rgb(251 113 133 / 0.45),
+      6px -6px 0 -2px rgb(250 204 21 / 0.4);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 0 0 rgb(45 212 191 / 0),
+      0 0 0 0 rgb(56 189 248 / 0),
+      0 0 0 0 rgb(167 139 250 / 0);
+  }
+}
+
+.animate-task-complete-confetti {
+  animation: task-complete-confetti 0.85s ease-out;
+}
+
+@keyframes task-complete-confetti-dark {
+  0% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 0 0 rgb(45 212 191 / 0),
+      0 0 0 0 rgb(56 189 248 / 0),
+      0 0 0 0 rgb(167 139 250 / 0);
+  }
+  35% {
+    filter: brightness(1.12);
+    box-shadow:
+      0 0 0 1px rgb(45 212 191 / 0.5),
+      -8px -6px 0 -1px rgb(56 189 248 / 0.4),
+      8px 5px 0 -1px rgb(167 139 250 / 0.38);
+  }
+  55% {
+    box-shadow:
+      0 0 18px 2px rgb(45 212 191 / 0.28),
+      -5px 8px 0 -2px rgb(251 113 133 / 0.35),
+      6px -6px 0 -2px rgb(250 204 21 / 0.32);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 0 0 rgb(45 212 191 / 0),
+      0 0 0 0 rgb(56 189 248 / 0),
+      0 0 0 0 rgb(167 139 250 / 0);
+  }
+}
+
+.dark .animate-task-complete-confetti {
+  animation: task-complete-confetti-dark 0.85s ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  .animate-task-complete-confetti {
+    animation: task-complete-confetti-dark 0.85s ease-out;
+  }
+}
