@@ -131,6 +131,31 @@ export default function App() {
   const addPhaseButtonRef = useRef<HTMLButtonElement | null>(null)
   const addPhasePopoverRef = useRef<HTMLDivElement | null>(null)
   const newPhaseInputRef = useRef<HTMLInputElement | null>(null)
+  const phaseTabBarRef = useRef<HTMLDivElement | null>(null)
+  const phaseTabTrackRef = useRef<HTMLDivElement | null>(null)
+  const [phaseTabScroll, setPhaseTabScroll] = useState({ scrollLeft: 0, clientWidth: 0, scrollWidth: 0 })
+
+  const updatePhaseTabScroll = useCallback(() => {
+    const el = phaseTabBarRef.current
+    if (!el) return
+    setPhaseTabScroll({
+      scrollLeft: el.scrollLeft,
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+    })
+  }, [])
+
+  useEffect(() => {
+    updatePhaseTabScroll()
+  }, [visiblePhases, updatePhaseTabScroll])
+
+  useEffect(() => {
+    const el = phaseTabBarRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => updatePhaseTabScroll())
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updatePhaseTabScroll])
 
   function cancelPendingTabSwitch() {
     if (tabClickTimerRef.current) {
@@ -339,6 +364,77 @@ export default function App() {
   const phaseForOpenMenu = useMemo(
     () => (menuOpenFor === null ? null : visiblePhases.find((p) => p.id === menuOpenFor) ?? null),
     [menuOpenFor, visiblePhases],
+  )
+
+  const phaseTabMaxScroll = Math.max(0, phaseTabScroll.scrollWidth - phaseTabScroll.clientWidth)
+  const phaseTabThumbWidthPct =
+    phaseTabScroll.scrollWidth <= phaseTabScroll.clientWidth || phaseTabScroll.clientWidth === 0
+      ? 100
+      : (phaseTabScroll.clientWidth / phaseTabScroll.scrollWidth) * 100
+  const phaseTabThumbLeftPct =
+    phaseTabMaxScroll <= 0 ? 0 : (phaseTabScroll.scrollLeft / phaseTabMaxScroll) * (100 - phaseTabThumbWidthPct)
+  const canPhaseTabScrollLeft = phaseTabScroll.scrollLeft > 0.5
+  const canPhaseTabScrollRight = phaseTabScroll.scrollLeft < phaseTabMaxScroll - 0.5
+  const phaseTabThumbColor = activePhase?.color ?? '#14b8a6'
+
+  const scrollPhaseTabsBy = useCallback((delta: number) => {
+    phaseTabBarRef.current?.scrollBy({ left: delta, behavior: 'smooth' })
+  }, [])
+
+  const onPhaseTabThumbPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const scrollEl = phaseTabBarRef.current
+      const track = phaseTabTrackRef.current
+      if (!scrollEl || !track) return
+      const startX = e.clientX
+      const startScroll = scrollEl.scrollLeft
+      const maxScroll = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth)
+      const trackW = track.clientWidth
+      const thumbW = (scrollEl.clientWidth / scrollEl.scrollWidth) * trackW
+      const scrollRange = Math.max(0, trackW - thumbW)
+      e.currentTarget.setPointerCapture(e.pointerId)
+      const onMove = (ev: PointerEvent) => {
+        if (scrollRange <= 0 || maxScroll <= 0) return
+        const dx = ev.clientX - startX
+        const dScroll = (dx / scrollRange) * maxScroll
+        scrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, startScroll + dScroll))
+        updatePhaseTabScroll()
+      }
+      const onUp = (ev: PointerEvent) => {
+        try {
+          e.currentTarget.releasePointerCapture(ev.pointerId)
+        } catch {
+          /* ignore */
+        }
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+      }
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [updatePhaseTabScroll],
+  )
+
+  const onPhaseTabTrackPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement).dataset.phaseTabThumb != null) return
+      const scrollEl = phaseTabBarRef.current
+      const track = phaseTabTrackRef.current
+      if (!scrollEl || !track) return
+      const maxScroll = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth)
+      if (maxScroll <= 0) return
+      const rect = track.getBoundingClientRect()
+      const thumbPx = (scrollEl.clientWidth / scrollEl.scrollWidth) * rect.width
+      const x = e.clientX - rect.left
+      const scrollRange = rect.width - thumbPx
+      if (scrollRange <= 0) return
+      const nextScroll = ((x - thumbPx / 2) / scrollRange) * maxScroll
+      scrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, nextScroll))
+      updatePhaseTabScroll()
+    },
+    [updatePhaseTabScroll],
   )
 
   const totalProgress = getTotalProgress()
@@ -594,13 +690,37 @@ export default function App() {
             </div>
           ) : null}
 
-          <div
-            className="phase-tabbar-scroll flex gap-1 overflow-x-auto pb-1"
-            role="tablist"
-            aria-label="Project phases"
-            onMouseEnter={maybeShowRenameHintOnce}
-            onMouseLeave={() => setRenameHintVisible(false)}
-          >
+          <div className="flex flex-col gap-1">
+            <div className="flex min-h-0 items-end gap-1">
+              <button
+                type="button"
+                className={`inline-flex size-7 shrink-0 items-center justify-center rounded text-slate-400 transition-opacity hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 ${
+                  canPhaseTabScrollLeft ? 'opacity-100' : 'pointer-events-none opacity-30'
+                }`}
+                aria-label="Scroll phase tabs left"
+                aria-disabled={!canPhaseTabScrollLeft}
+                onClick={() => {
+                  if (canPhaseTabScrollLeft) scrollPhaseTabsBy(-200)
+                }}
+              >
+                <svg className="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path
+                    fillRule="evenodd"
+                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              <div
+                ref={phaseTabBarRef}
+                className="phase-tabbar-scroll flex min-h-0 min-w-0 flex-1 gap-1 overflow-x-auto pb-0"
+                role="tablist"
+                aria-label="Project phases"
+                onMouseEnter={maybeShowRenameHintOnce}
+                onMouseLeave={() => setRenameHintVisible(false)}
+                onScroll={updatePhaseTabScroll}
+              >
             {visiblePhases.map((phase) => {
               const { done, total } = getPhaseProgress(phase.id)
               const phaseTabPct = total === 0 ? 0 : Math.round((done / total) * 100)
@@ -811,6 +931,49 @@ export default function App() {
                 <span className="size-2 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" aria-hidden />
                 <span className="whitespace-nowrap font-medium">+</span>
               </button>
+            </div>
+              </div>
+
+              <button
+                type="button"
+                className={`inline-flex size-7 shrink-0 items-center justify-center rounded text-slate-400 transition-opacity hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 ${
+                  canPhaseTabScrollRight ? 'opacity-100' : 'pointer-events-none opacity-30'
+                }`}
+                aria-label="Scroll phase tabs right"
+                aria-disabled={!canPhaseTabScrollRight}
+                onClick={() => {
+                  if (canPhaseTabScrollRight) scrollPhaseTabsBy(200)
+                }}
+              >
+                <svg className="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div
+              ref={phaseTabTrackRef}
+              className="relative h-[3px] w-full select-none rounded-full bg-slate-200/90 dark:bg-slate-700/90"
+              onPointerDown={onPhaseTabTrackPointerDown}
+            >
+              <div
+                data-phase-tab-thumb="true"
+                className="absolute top-0 h-full cursor-grab touch-none rounded-full active:cursor-grabbing"
+                style={{
+                  width: `${phaseTabThumbWidthPct}%`,
+                  left: `${phaseTabThumbLeftPct}%`,
+                  backgroundColor: phaseTabThumbColor,
+                }}
+                onPointerDown={(e) => {
+                  e.stopPropagation()
+                  onPhaseTabThumbPointerDown(e)
+                }}
+                aria-hidden
+              />
             </div>
           </div>
 
