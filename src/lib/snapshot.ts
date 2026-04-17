@@ -190,6 +190,9 @@ export function mirrorPayloadToLocalStorage(payload: ReturnType<typeof buildAppD
 
 export async function upsertSnapshotToSupabase(): Promise<{ error: Error | null }> {
   const payload = buildAppDataUpsertPayload()
+  if (!supabase) {
+    return { error: null }
+  }
   const { error } = await supabase.from('app_data').upsert(payload, { onConflict: 'id' })
   if (!error) {
     mirrorPayloadToLocalStorage(payload)
